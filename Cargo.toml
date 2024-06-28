@@ -1,0 +1,16 @@
+[package]
+name = "holmium"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.13"
+bevy_embedded_assets = "0.10.2"
+bevy_titan = "0.6.0"
+bevy_ecs_ldtk = { git = "https://github.com/Trouv/bevy_ecs_ldtk", features = ["atlas"] }
+bevy_ecs_tilemap = "0.12"
+pathfinding = "4.10.0"
+itertools = "0.13.0"
+
+[patch.crates-io]
+bevy_ecs_tilemap = { git = "https://github.com/StarArawn/bevy_ecs_tilemap" }

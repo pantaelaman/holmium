@@ -1,0 +1,12 @@
+(
+    textures: [
+        (
+            path: "tilemap.png",
+            sprite_sheet: Homogeneous (
+                tile_size: (16, 16),
+                columns: 30,
+                rows: 11,
+            ),
+        ),
+    ]
+)
