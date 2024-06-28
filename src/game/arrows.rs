@@ -5,9 +5,13 @@ use bevy::{
     entity::Entity,
     event::EventReader,
     query::With,
-    schedule::NextState,
+    schedule::{NextState, State},
     system::{Commands, Query, Res, ResMut, Resource},
-  }, hierarchy::DespawnRecursiveExt, input::{keyboard::KeyCode, ButtonInput}, sprite::{SpriteSheetBundle, TextureAtlas}, utils::HashMap
+  },
+  hierarchy::DespawnRecursiveExt,
+  input::{keyboard::KeyCode, ButtonInput},
+  sprite::{SpriteSheetBundle, TextureAtlas},
+  utils::HashMap,
 };
 use bevy_ecs_ldtk::{GridCoords, LdtkEntity};
 use bevy_ecs_tilemap::{
@@ -26,7 +30,8 @@ use crate::{
 };
 
 use super::{
-  cursor::Cursor, input::MovementInput, GameEntity, GameState, ZoneMap,
+  cursor::Cursor, input::MovementInput, ArrowMap, GameEntity, GameState,
+  TurnState, ZoneMap,
 };
 
 #[derive(Default, Component)]
@@ -93,24 +98,38 @@ impl std::ops::DerefMut for ArrowHead {
 pub fn create_arrow_chunk(
   arrow_index: usize,
   grid_coords: GridCoords,
-) -> ArrowChunkBundle {
-  let mut arrow_chunk = ArrowChunkBundle::default();
-  arrow_chunk.sprite_bundle.transform.translation.z = 20.0;
-  arrow_chunk.sprite_bundle.texture = ATLAS_INFO.get().unwrap().image.clone();
-  arrow_chunk.sprite_bundle.atlas = TextureAtlas {
-    layout: ATLAS_INFO.get().unwrap().layout.clone(),
-    index: arrow_index,
-  };
-  arrow_chunk.grid_coords = grid_coords;
-  arrow_chunk
+  tilemap_id: Entity,
+) -> impl Bundle {
+  (
+    TileBundle {
+      position: TilePos {
+        x: grid_coords.x as u32,
+        y: grid_coords.y as u32,
+      },
+      texture_index: TileTextureIndex(arrow_index as u32),
+      tilemap_id: TilemapId(tilemap_id),
+      ..Default::default()
+    },
+    ArrowChunk,
+  )
+}
+
+#[inline]
+pub fn arrow_index_turn_parity(
+  arrow_index: usize,
+  turn_state: &TurnState,
+) -> usize {
+  arrow_index + ((*turn_state == TurnState::Player2) as usize * 4)
 }
 
 pub fn move_arrow_head(
   mut commands: Commands,
   arrow_chunks: Query<Entity, With<ArrowChunk>>,
+  arrow_map: Query<Entity, With<ArrowMap>>,
   mut arrow_head: ResMut<ArrowHead>,
   keys: Res<ButtonInput<KeyCode>>,
   moveable_region: Res<MoveableRegion>,
+  current_turn_state: Res<State<TurnState>>,
   mut next_game_state: ResMut<NextState<GameState>>,
   mut movement_events: EventReader<MovementInput>,
 ) {
@@ -145,14 +164,18 @@ pub fn move_arrow_head(
   if let Some(first_parent_coords) = moveable_region.get(&current_coords) {
     let distance = current_coords - *first_parent_coords;
     commands.spawn(create_arrow_chunk(
-      match (distance.x, distance.y) {
-        (-1, 0) => ARROW_HEAD_L,
-        (1, 0) => ARROW_HEAD_R,
-        (0, -1) => ARROW_HEAD_D,
-        (0, 1) => ARROW_HEAD_U,
-        _ => unreachable!(),
-      },
+      arrow_index_turn_parity(
+        match (distance.x, distance.y) {
+          (-1, 0) => ARROW_HEAD_L,
+          (1, 0) => ARROW_HEAD_R,
+          (0, -1) => ARROW_HEAD_D,
+          (0, 1) => ARROW_HEAD_U,
+          _ => unreachable!(),
+        },
+        &current_turn_state,
+      ),
       current_coords,
+      arrow_map.single(),
     ));
   }
 
@@ -182,7 +205,11 @@ pub fn move_arrow_head(
       _ => unreachable!(),
     };
 
-    commands.spawn(create_arrow_chunk(arrow_index, *target_coords));
+    commands.spawn(create_arrow_chunk(
+      arrow_index_turn_parity(arrow_index, &current_turn_state),
+      *target_coords,
+      arrow_map.single(),
+    ));
 
     current_coords = *target_coords;
   }
@@ -240,16 +267,18 @@ pub fn calculate_moveable_region(
       x: moveable_coord.x as u32,
       y: moveable_coord.y as u32,
     };
-    let tile = commands.spawn((TileBundle {
-      position: tile_pos,
-      texture_index: TileTextureIndex(ZONE_MOVE as u32),
-      tilemap_id: TilemapId(zone_map.single().0),
-      ..Default::default()
-    }, MovementZone)).id();
-    zone_map.single_mut().1.set(
-      &tile_pos,
-      tile,
-    );
+    let tile = commands
+      .spawn((
+        TileBundle {
+          position: tile_pos,
+          texture_index: TileTextureIndex(ZONE_MOVE as u32),
+          tilemap_id: TilemapId(zone_map.single().0),
+          ..Default::default()
+        },
+        MovementZone,
+      ))
+      .id();
+    zone_map.single_mut().1.set(&tile_pos, tile);
   }
 
   commands.insert_resource(MoveableRegion(moveable));

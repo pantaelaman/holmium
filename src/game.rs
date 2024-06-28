@@ -5,9 +5,8 @@ use crate::{
 use bevy::{prelude::*, render::camera::ScalingMode};
 use bevy_ecs_ldtk::prelude::*;
 use bevy_ecs_tilemap::{
-  helpers::geometry::get_tilemap_center_transform,
   map::{
-    TilemapGridSize, TilemapSize, TilemapTexture, TilemapTileSize, TilemapType,
+    TilemapSize, TilemapTexture, TilemapTileSize, TilemapType,
   },
   tiles::TileStorage,
   TilemapBundle,
