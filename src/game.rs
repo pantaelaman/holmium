@@ -1,22 +1,25 @@
 use crate::{
   assets::{LdtkWorldHandle, ATLAS_INFO},
+  game::units::UnitSpawnQueues,
   GlobalState,
 };
 use bevy::{prelude::*, render::camera::ScalingMode};
 use bevy_ecs_ldtk::prelude::*;
 use bevy_ecs_tilemap::{
-  map::{
-    TilemapSize, TilemapTexture, TilemapTileSize, TilemapType,
-  },
+  map::{TilemapSize, TilemapTexture, TilemapTileSize, TilemapType},
   tiles::TileStorage,
   TilemapBundle,
 };
 
-use self::input::MovementInput;
+use self::{
+  input::MovementInput,
+  units::{Unit, UnitAssociations, UnitSpawnLocationBundle},
+};
 
 pub mod arrows;
 pub mod cursor;
 pub mod input;
+pub mod units;
 
 #[derive(Default, Debug, PartialEq, Eq, Hash, Clone, Copy, States)]
 pub enum TurnState {
@@ -40,6 +43,9 @@ impl Plugin for GamePlugin {
       .init_state::<TurnState>()
       .init_state::<GameState>()
       .add_event::<MovementInput>()
+      .register_ldtk_entity::<UnitSpawnLocationBundle>("BLUE_SPAWN")
+      .register_ldtk_entity::<UnitSpawnLocationBundle>("RED_SPAWN")
+      .insert_resource(UnitAssociations::default())
       .add_systems(
         OnEnter(GlobalState::Game),
         (init_world, cursor::init_cursor).chain(),
@@ -50,13 +56,23 @@ impl Plugin for GamePlugin {
       )
       .add_systems(OnExit(GameState::ArrowMovement), arrows::clear_drawn_arrows)
       .add_systems(
+        OnTransition {
+          from: TurnState::Player2,
+          to: TurnState::Player1,
+        },
+        units::refresh_units,
+      )
+      .add_systems(
         Update,
         (
           crate::tiles::cache_tile_types,
+          units::fill_unit_spawn_locations,
+          units::update_unit_associations_resource,
           input::movement_events,
           cursor::move_cursor.run_if(in_state(GameState::CursorMovement)),
           arrows::move_arrow_head.run_if(in_state(GameState::ArrowMovement)),
           update_grid_coord_positions,
+          units::update_backdrop_positions,
         )
           .chain()
           .run_if(in_state(GlobalState::Game)),
@@ -69,9 +85,12 @@ struct GameEntity;
 
 #[derive(Default, Component, Clone, Copy)]
 pub struct ZoneMap;
-
 #[derive(Default, Component, Clone, Copy)]
 pub struct ArrowMap;
+#[derive(Default, Component, Clone, Copy)]
+pub struct BackdropMap;
+#[derive(Default, Component, Clone, Copy)]
+pub struct UnitMap;
 
 #[derive(Resource)]
 pub struct GlobalCamera(Entity);
@@ -146,8 +165,12 @@ fn init_world(
 
   commands.spawn(create_tilemap(5.0, &level_size, ZoneMap));
   commands.spawn(create_tilemap(20.0, &level_size, ArrowMap));
+  commands.spawn(create_tilemap(15.0, &level_size, BackdropMap));
+  commands.spawn(create_tilemap(18.0, &level_size, UnitMap));
 
   commands.insert_resource(level_size);
+
+  commands.insert_resource(UnitSpawnQueues::default());
 }
 
 fn create_tilemap<T: Bundle>(
@@ -188,11 +211,13 @@ fn create_tilemap<T: Bundle>(
 
 fn update_grid_coord_positions(
   mut grid_coord_entities: Query<
-    (&mut Transform, &GridCoords),
+    (Option<&Unit>, &mut Transform, &GridCoords),
     (With<GameEntity>, Changed<GridCoords>),
   >,
 ) {
-  for (mut transform, grid_coords) in grid_coord_entities.iter_mut() {
+  for (possible_unit, mut transform, grid_coords) in
+    grid_coord_entities.iter_mut()
+  {
     transform.translation = bevy_ecs_ldtk::utils::grid_coords_to_translation(
       *grid_coords,
       IVec2::splat(16),

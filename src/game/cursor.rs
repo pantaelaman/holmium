@@ -5,7 +5,13 @@ use bevy::{
   asset::Assets,
   core::Name,
   ecs::{
-    bundle::Bundle, component::Component, entity::Entity, event::EventReader, query::With, schedule::{NextState, State}, system::{Commands, Query, Res, ResMut, Resource}
+    bundle::Bundle,
+    component::Component,
+    entity::Entity,
+    event::EventReader,
+    query::With,
+    schedule::{NextState, State},
+    system::{Commands, Query, Res, ResMut, Resource},
   },
   input::{keyboard::KeyCode, ButtonInput},
   log::info,
@@ -13,10 +19,14 @@ use bevy::{
   sprite::{SpriteSheetBundle, TextureAtlas},
 };
 use bevy_ecs_ldtk::{GridCoords, LdtkEntity};
+use bevy_ecs_tilemap::tiles::TileStorage;
+use std::ops::Deref;
 
-use crate::{assets::AtlasInfo, tiles::{Grassy, CURSOR}};
+use crate::{assets::AtlasInfo, tiles::CURSOR};
 
-use super::{arrows::ArrowHead, input::MovementInput, GameEntity, GameState, TurnState};
+use super::{
+  arrows::ArrowHead, input::MovementInput, units::{Unit, UnitAssociation, UnitAssociations}, GameEntity, GameState, TurnState, UnitMap
+};
 
 #[derive(Default, Component)]
 pub struct Cursor;
@@ -45,7 +55,7 @@ pub fn init_cursor(
     layout: atlas_info.layout.clone(),
     index: CURSOR,
   };
-  cursor_bundle.sprite_bundle.transform.translation.z = 10.0;
+  cursor_bundle.sprite_bundle.transform.translation.z = 25.0;
   let name = Name::new("cursor");
 
   let mut animation = AnimationClip::default();
@@ -73,20 +83,36 @@ pub fn init_cursor(
   commands.spawn(cursor_bundle);
 }
 
+#[derive(Default, Component)]
+pub struct Targeted;
+
 pub fn move_cursor(
   mut commands: Commands,
   mut cursor: Query<&mut GridCoords, With<Cursor>>,
   keys: Res<ButtonInput<KeyCode>>,
   mut movement_events: EventReader<MovementInput>,
+  turn_state: Res<State<TurnState>>,
+  unit_associations: Res<UnitAssociations>,
   mut next_game_state: ResMut<NextState<GameState>>,
+  units: Query<(&Unit, &UnitAssociation)>,
+  unit_storage: Query<&TileStorage, With<UnitMap>>,
 ) {
   for movement_event in movement_events.read() {
     *cursor.single_mut() += movement_event.as_grid_coords();
   }
 
   if keys.just_pressed(KeyCode::Enter) {
-    next_game_state.set(GameState::ArrowMovement);
-    commands.insert_resource(ArrowHead(cursor.single().clone()));
-    info!("Entering arrow movement at {:?}", cursor.single());
+    if let Some(entity) = unit_storage
+      .single()
+      .checked_get(&crate::util::grid_to_tile(*cursor.single()))
+    {
+      let (unit, association) = units.get(entity).unwrap();
+      if association.turn == *turn_state.get() && !unit.moved {
+        next_game_state.set(GameState::ArrowMovement);
+        commands.entity(entity).insert(Targeted);
+        commands.insert_resource(ArrowHead(cursor.single().clone()));
+        info!("targeting unit {:?}", entity);
+      }
+    }
   }
 }

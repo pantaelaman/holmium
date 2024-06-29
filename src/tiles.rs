@@ -69,6 +69,17 @@ pub const FOREST_LIGHT: usize = index(4, 5);
 pub const FOREST_HEAVY: usize = index(4, 6);
 pub const MOUNTAINS: usize = index(5, 5);
 
+// turn association backdrops
+pub const BACKDROP_BLUE: usize = index(6, 5);
+pub const BACKDROP_RED: usize = index(7, 5);
+
+// units
+pub const UNIT_WIZARD: usize = index(19, 7);
+pub const UNIT_ARCHER: usize = index(20, 7);
+pub const UNIT_BARBARIAN: usize = index(22, 7);
+pub const UNIT_KNIGHT: usize = index(19, 8);
+pub const UNIT_CLERIC: usize = index(23, 8);
+
 #[inline]
 const fn index(col: usize, row: usize) -> usize {
   row * TILESET_WIDTH + col

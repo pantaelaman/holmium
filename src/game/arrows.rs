@@ -4,7 +4,7 @@ use bevy::{
     component::Component,
     entity::Entity,
     event::EventReader,
-    query::With,
+    query::{With, Without},
     schedule::{NextState, State},
     system::{Commands, Query, Res, ResMut, Resource},
   },
@@ -30,8 +30,10 @@ use crate::{
 };
 
 use super::{
-  cursor::Cursor, input::MovementInput, ArrowMap, GameEntity, GameState,
-  TurnState, ZoneMap,
+  cursor::{Cursor, Targeted},
+  input::MovementInput,
+  units::Unit,
+  ArrowMap, GameEntity, GameState, TurnState, UnitMap, ZoneMap,
 };
 
 #[derive(Default, Component)]
@@ -130,10 +132,22 @@ pub fn move_arrow_head(
   keys: Res<ButtonInput<KeyCode>>,
   moveable_region: Res<MoveableRegion>,
   current_turn_state: Res<State<TurnState>>,
+  mut targeted_unit: Query<(Entity, &mut TilePos, &mut Unit), With<Targeted>>,
+  mut unit_map: Query<&mut TileStorage, With<UnitMap>>,
   mut next_game_state: ResMut<NextState<GameState>>,
   mut movement_events: EventReader<MovementInput>,
 ) {
   if keys.just_pressed(KeyCode::Enter) {
+    let destination = crate::util::grid_to_tile(**arrow_head);
+    let mut unit_map = unit_map.single_mut();
+    let mut targeted_unit = targeted_unit.single_mut();
+    targeted_unit.2.moved = true;
+    unit_map.remove(&targeted_unit.1);
+    unit_map.set(&destination, targeted_unit.0);
+    *targeted_unit.1 = destination;
+
+    commands.entity(targeted_unit.0).remove::<Targeted>();
+
     next_game_state.set(GameState::CursorMovement);
     return;
   }
@@ -252,12 +266,23 @@ pub fn calculate_moveable_region(
   mut commands: Commands,
   cursor: Query<&GridCoords, With<Cursor>>,
   mut zone_map: Query<(Entity, &mut TileStorage), With<ZoneMap>>,
+  targeted_unit: Query<&Unit, With<Targeted>>,
   tile_types: Res<TileTypes>,
+  unit_storage: Query<&TileStorage, (With<UnitMap>, Without<ZoneMap>)>,
 ) {
+  let max_move_cost = targeted_unit.single().max_move_cost;
   let moveable = HashMap::from_iter(
     pathfinding::directed::dijkstra::dijkstra_reach(
       cursor.single(),
-      |node, cost| node_neighbours_with_cost(&*tile_types, node, cost),
+      |node, cost| {
+        node_neighbours_with_cost(
+          &*tile_types,
+          unit_storage.single(),
+          node,
+          cost,
+          max_move_cost,
+        )
+      },
     )
     .filter_map(|item| item.parent.map(|parent| (item.node, parent))),
   );
@@ -286,15 +311,20 @@ pub fn calculate_moveable_region(
 
 fn node_neighbours_with_cost(
   tile_types: &TileTypes,
+  unit_positions: &TileStorage,
   node: &GridCoords,
   total_cost: usize,
+  maximum_cost: usize,
 ) -> impl IntoIterator<Item = (GridCoords, usize)> {
-  const MAXIMUM_COST: usize = 6;
-
   crate::util::neighbours(node)
     .into_iter()
     .filter_map(|node| {
-      if tile_types.grassy.contains(&node) {
+      if unit_positions
+        .checked_get(&crate::util::grid_to_tile(node))
+        .is_some()
+      {
+        None
+      } else if tile_types.grassy.contains(&node) {
         Some((node, 1))
       } else if tile_types.forested.contains(&node) {
         Some((node, 2))
@@ -302,6 +332,6 @@ fn node_neighbours_with_cost(
         None
       }
     })
-    .filter(|(_, cost)| total_cost + cost <= MAXIMUM_COST)
+    .filter(|(_, cost)| total_cost + cost <= maximum_cost)
     .collect_vec()
 }

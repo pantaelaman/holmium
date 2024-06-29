@@ -1,4 +1,5 @@
 use bevy_ecs_ldtk::GridCoords;
+use bevy_ecs_tilemap::tiles::TilePos;
 
 pub fn neighbours(grid_coord: &GridCoords) -> impl IntoIterator<Item=GridCoords> {
   [
@@ -21,3 +22,9 @@ pub fn neighbours(grid_coord: &GridCoords) -> impl IntoIterator<Item=GridCoords>
   ]
 }
 
+pub fn grid_to_tile(grid_coords: GridCoords) -> TilePos {
+  TilePos {
+    x: grid_coords.x as u32,
+    y: grid_coords.y as u32,
+  }
+}
