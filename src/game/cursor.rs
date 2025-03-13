@@ -22,10 +22,16 @@ use bevy_ecs_ldtk::{GridCoords, LdtkEntity};
 use bevy_ecs_tilemap::tiles::TileStorage;
 use std::ops::Deref;
 
-use crate::{assets::AtlasInfo, tiles::CURSOR};
+use crate::{
+  assets::AtlasInfo,
+  tiles::{CURSOR, CURSOR_BLUE_OFFSET},
+};
 
 use super::{
-  arrows::ArrowHead, input::MovementInput, units::{Unit, UnitAssociation, UnitAssociations}, GameEntity, GameState, TurnState, UnitMap
+  arrows::ArrowHead,
+  input::MovementInput,
+  units::{Unit, UnitAssociation, UnitAssociations},
+  GameEntity, GameState, TurnState, UnitMap,
 };
 
 #[derive(Default, Component)]

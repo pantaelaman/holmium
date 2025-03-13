@@ -4,10 +4,11 @@ use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_embedded_assets::{EmbeddedAssetPlugin, PluginMode};
 use bevy_titan::SpriteSheetLoaderPlugin;
 
-mod tiles;
 mod assets;
 mod game;
+mod tiles;
 mod util;
+mod windows;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash, States)]
 pub enum GlobalState {

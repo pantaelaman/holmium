@@ -25,7 +25,7 @@ use crate::{
   tiles::{
     TileTypes, ARROW_BODY_DL, ARROW_BODY_DR, ARROW_BODY_H, ARROW_BODY_UL,
     ARROW_BODY_UR, ARROW_BODY_V, ARROW_HEAD_D, ARROW_HEAD_L, ARROW_HEAD_R,
-    ARROW_HEAD_U, ZONE_MOVE,
+    ARROW_HEAD_U, ARROW_RED_OFFSET, ZONE_MOVE,
   },
 };
 
@@ -121,7 +121,8 @@ pub fn arrow_index_turn_parity(
   arrow_index: usize,
   turn_state: &TurnState,
 ) -> usize {
-  arrow_index + ((*turn_state == TurnState::Player2) as usize * 4)
+  arrow_index
+    + ((*turn_state == TurnState::Player2) as usize * ARROW_RED_OFFSET)
 }
 
 pub fn move_arrow_head(

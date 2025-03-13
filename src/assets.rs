@@ -1,7 +1,10 @@
-use std::sync::OnceLock;
-use crate::GlobalState;
+use crate::{
+  tiles::{TILESET_HEIGHT, TILESET_WIDTH},
+  GlobalState,
+};
 use bevy::prelude::*;
 use bevy_ecs_ldtk::assets::LdtkProject;
+use std::sync::OnceLock;
 
 pub static ATLAS_INFO: OnceLock<AtlasInfo> = OnceLock::new();
 
@@ -27,7 +30,7 @@ pub struct LdtkWorldHandle(Handle<LdtkProject>);
 
 impl std::ops::Deref for LdtkWorldHandle {
   type Target = Handle<LdtkProject>;
-  
+
   fn deref(&self) -> &Self::Target {
     &self.0
   }
@@ -42,8 +45,8 @@ pub fn load_assets(
     image: server.load("tilemap.png"),
     layout: layouts.add(TextureAtlasLayout::from_grid(
       Vec2 { x: 16.0, y: 16.0 },
-      30,
-      11,
+      TILESET_WIDTH,
+      TILESET_HEIGHT,
       None,
       None,
     )),
